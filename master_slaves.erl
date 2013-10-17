@@ -60,11 +60,11 @@ create_slaves(N) ->
 %%
 %%
 to_slave(N, Msg) ->
-	master ! { "Msg", N, Msg },
+	master ! { msg, N, Msg },
 	receive
 		{Pid, Msg} ->
 			io:format("Slave ~p got message: ~p ~n",[Pid, Msg]);
-		{Pid, "LOST"} ->
+		{Pid, lost} ->
 			io:format("Didn't find pair Pid to N: ~p ~n", [Pid]);
 		{_, N} ->
 			io:format("Recreated failed process ~p.~n", [N]);
@@ -78,19 +78,19 @@ to_slave(N, Msg) ->
 %%
 master_listen(List) ->
 	receive
-		{"Msg", _, "HALT"} ->
+		{msg, _, halt} ->
 			shutdown_slaves(List),
 			output ! "Master process going down.",
 			exit(0);
-		{ "Msg", N, Msg } ->
+		{ msg, N, Msg } ->
 			case lists:keyfind(N, 2, List) of
 				false ->
-					output ! {N, "LOST"};
+					output ! {N, lost};
 				{Pid, _} ->
 					Pid ! Msg
 			end,
 			master_listen(List);
-		{ "Log", N, Msg } ->
+		{ log, N, Msg } ->
 			output ! {N, Msg},
 			master_listen(List);
 		{'EXIT', Pid, _} ->
@@ -106,11 +106,11 @@ master_listen(List) ->
 shutdown_slaves(List) ->
 	case List of
 		{ PID, _ } ->
-			PID ! "DIE";
+			PID ! die;
 		[ Head | Tail ] ->
 			case Tail of
 				{ Pid, _ } ->
-					Pid ! "DIE";
+					Pid ! die;
 				_ ->
 					nil
 			end,
@@ -125,10 +125,10 @@ shutdown_slaves(List) ->
 %%
 slave_listen() ->
 	receive
-		"DIE"->
+		die->
 			exit(normal);
 		Msg ->
-			master ! { "Log", self(), Msg },
+			master ! { log, self(), Msg },
 			slave_listen()
 	end.
 
